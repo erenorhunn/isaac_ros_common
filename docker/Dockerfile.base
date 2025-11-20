@@ -503,3 +503,11 @@ COPY middleware_profile[s]/*profile.xml /usr/local/share/middleware_profiles/
 
 # Store list of packages (must be last)
 RUN mkdir -p /opt/nvidia/isaac_ros_dev_base && dpkg-query -W | sort > /opt/nvidia/isaac_ros_dev_base/base-end-packages.csv
+
+# Install Munkres
+RUN git clone https://github.com/saebyn/munkres-cpp.git && \
+    cd munkres-cpp && \
+    mkdir build && cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release .. && \
+    make && \
+    make install
