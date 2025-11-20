@@ -1,8 +1,20 @@
-# ARG BASE_IMAGE, bir önceki Dockerfile'dan otomatik olarak alınır.
+# ================
+# Base Image (handled by run_dev.sh)
+# ================
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
-# Gerekli bağımlılıkların kurulumu (libavresample-dev -> libswresample-dev olarak düzeltildi)
+# ================
+# Remove Ubuntu OpenCV (PREVENT conflicts)
+# ================
+RUN apt-get update && apt-get remove -y \
+    libopencv-dev libopencv-core-dev libopencv-imgproc-dev libopencv-highgui-dev || true && \
+    apt autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# ================
+# Install OpenCV Dependencies
+# ================
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake git wget unzip yasm pkg-config \
     libswscale-dev libgtk2.0-dev libtbb-dev libavcodec-dev \
@@ -11,13 +23,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgflags-dev libgphoto2-dev libeigen3-dev libhdf5-dev \
  && rm -rf /var/lib/apt/lists/*
 
-# Derlenecek OpenCV sürümü
+# ================
+# Download OpenCV + contrib
+# ================
 ENV OPENCV_VERSION=4.x
 
-RUN git clone --branch ${OPENCV_VERSION} --depth 1 https://github.com/opencv/opencv.git /tmp/opencv \
- && git clone --branch ${OPENCV_VERSION} --depth 1 https://github.com/opencv/opencv_contrib.git /tmp/opencv_contrib
+RUN git clone --branch ${OPENCV_VERSION} --depth 1 https://github.com/opencv/opencv.git /tmp/opencv && \
+    git clone --branch ${OPENCV_VERSION} --depth 1 https://github.com/opencv/opencv_contrib.git /tmp/opencv_contrib
 
-# Derleme dizinini oluştur ve derlemeyi başlat
+# ================
+# Build OpenCV with CUDA 12.6
+# ================
 WORKDIR /tmp/opencv/build
 
 RUN cmake \
@@ -37,8 +53,26 @@ RUN cmake \
         -D BUILD_PERF_TESTS=OFF \
         -D WITH_TBB=ON \
         -D BUILD_opencv_sfm=OFF \
-        .. \
- && make -j$(nproc) \
- && make install \
- && ldconfig \
- && rm -rf /tmp/opencv /tmp/opencv_contrib
+        .. && \
+    make -j$(nproc) && \
+    make install && \
+    ldconfig && \
+    rm -rf /tmp/opencv /tmp/opencv_contrib
+
+# ================
+# FIX pkg-config → OpenCV 4.13.0 instead of Ubuntu 4.5.4
+# ================
+RUN mkdir -p /usr/lib/pkgconfig && \
+    ln -sf /usr/local/lib/pkgconfig/opencv4.pc /usr/lib/pkgconfig/opencv4.pc
+
+# ================
+# Install munkres-cpp library
+# ================
+WORKDIR /tmp/munkres
+
+RUN git clone https://github.com/saebyn/munkres-cpp.git && \
+    cd munkres-cpp && \
+    mkdir build && cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Debug -DMUNKRESCPP_DEVEL_MODE=ON .. && \
+    make tests && \
+    tests/munkrestest
