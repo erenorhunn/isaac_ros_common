@@ -78,6 +78,8 @@ RUN python3 -m pip install -U \
 RUN --mount=type=cache,target=/var/cache/apt \
 apt-get update && apt-get install -y \
     ros-humble-ros-base \
+    ros-humble-desktop \
+    ros-dev-tools \
     ros-humble-angles \
     ros-humble-apriltag \
     ros-humble-behaviortree-cpp-v3 \
