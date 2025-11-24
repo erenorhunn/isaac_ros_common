@@ -281,13 +281,19 @@ if [[ $VERBOSE -eq 1 ]]; then
     set -x
 fi
 
+xhost +
+
 docker run -it --rm \
     --privileged \
     --network host \
     --ipc=host \
     --gpus all \
     -e DISPLAY=$DISPLAY \
+    --device=/dev/video0 \
+    --group-add video \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v /dev/*:/dev/* \
+    -v /etc/vulkan/icd.d/nvidia.icd:/etc/vulkan/icd.d/nvidia.icd \
     ${DOCKER_ARGS[@]} \
     -v $ISAAC_ROS_DEV_DIR:/workspaces/isaac_ros-dev \
     -v /etc/localtime:/etc/localtime:ro \

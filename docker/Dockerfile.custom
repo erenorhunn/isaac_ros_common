@@ -1,5 +1,5 @@
 # ==============================================================================
-# Base Image (run_dev.sh tarafından sağlanır, genelde isaac_ros_dev-x86_64 veya aarch64)
+# Base Image (run_dev.sh tarafından sağlanır)
 # ==============================================================================
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
@@ -7,37 +7,17 @@ FROM ${BASE_IMAGE}
 # ==============================================================================
 # 1. Temel Sistem Araçları ve GUI Bağımlılıkları
 # ==============================================================================
-# PySide6 ve OpenCV-Python'un çalışması için gerekli grafik kütüphaneleri
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget \
-    curl \
-    git \
-    nano \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libxkbcommon-x11-0 \
-    libegl1-mesa \
-    libdbus-1-3 \
-    libxcb-icccm4 \
-    libxcb-image0 \
-    libxcb-keysyms1 \
-    libxcb-randr0 \
-    libxcb-render-util0 \
-    libxcb-xinerama0 \
-    libxcb-xinput0 \
-    libxcb-xfixes0 \
-    libxcb-cursor0 \
-    python3-posix-ipc \
-    python3-numpy \
+    wget curl git nano libgl1-mesa-glx libglib2.0-0 libxkbcommon-x11-0 libegl1-mesa \
+    libdbus-1-3 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+    libxcb-render-util0 libxcb-xinerama0 libxcb-xinput0 libxcb-xfixes0 \
+    libxcb-cursor0 python3-posix-ipc python3-numpy ros-humble-magic-enum \
     && rm -rf /var/lib/apt/lists/*
 
 # ==============================================================================
 # 2. Miniforge (Conda) Kurulumu
 # ==============================================================================
-# Mimariyi (x86_64 veya aarch64/Jetson) otomatik algılar
 ENV CONDA_DIR=/opt/conda
-ENV PATH=$CONDA_DIR/bin:$PATH
-
 RUN ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
         INSTALLER_URL="https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"; \
@@ -49,37 +29,45 @@ RUN ARCH=$(uname -m) && \
     wget -q $INSTALLER_URL -O /tmp/miniforge.sh && \
     /bin/bash /tmp/miniforge.sh -b -p $CONDA_DIR && \
     rm /tmp/miniforge.sh && \
-    conda clean --all -y
+    /opt/conda/bin/conda config --set auto_activate_base false && \
+    /opt/conda/bin/conda clean --all -y
 
 # ==============================================================================
 # 3. 'qt' Ortamının Hazırlanması
 # ==============================================================================
-# Python 3.10 ile ortamı kur ve gerekli paketleri yükle
-# Not: rclpy'ı pip ile kurmuyoruz, sistemden (ROS) çekeceğiz.
-RUN conda create -n qt python=3.10 -y && \
+RUN /opt/conda/bin/conda create -n qt python=3.10 -y && \
     /opt/conda/envs/qt/bin/pip install \
-        PySide6 \
-        opencv-python \
-        numpy \
-        pyyaml \
-    && conda clean --all -y
+        PySide6 opencv-python numpy pyyaml \
+    && /opt/conda/bin/conda clean --all -y
 
 # ==============================================================================
-# 4. Ortam Ayarları (.bashrc)
+# 4. Ortam Ayarları (Sistem Geneli)
 # ==============================================================================
-# Container açıldığında sırasıyla:
-# 1. ROS 2 Humble ortamını yükle (Sistem kütüphaneleri için)
-# 2. Isaac ROS workspace'ini yükle (Bizim mesajlarımız için)
-# 3. Conda 'qt' ortamını aktif et
-# 4. PYTHONPATH'i güncelle (Conda python'unun ROS kütüphanelerini görmesi için)
-
 RUN pip install catkin_pkg empy==3.3.4 lark numpy
 
-RUN echo 'source /opt/ros/humble/setup.bash' >> /root/.bashrc && \
-    echo 'source /workspaces/isaac_ros-dev/install/setup.bash' >> /root/.bashrc && \
-    echo 'conda activate qt' >> /root/.bashrc && \
-    # Kritik: Conda Python'unun ROS 2 paketlerini görmesini sağlayan ayar
-    echo 'export PYTHONPATH=$PYTHONPATH:/opt/ros/humble/lib/python3.10/site-packages:/workspaces/isaac_ros-dev/install/sadek_interfaces/local/lib/python3.10/dist-packages' >> /root/.bashrc
-
-# Shell başlangıcında conda'yı initialize et
-RUN conda init bash
+# --- NİHAİ ÇÖZÜM BURADA ---
+# Ayarları, interaktif bir shell başlatan HER KULLANICI için geçerli olacak
+# /etc/bash.bashrc dosyasına ekliyoruz.
+RUN echo '' >> /etc/bash.bashrc && \
+    echo '# =========================================================' >> /etc/bash.bashrc && \
+    echo '# Custom Isaac ROS & Conda Environment Setup' >> /etc/bash.bashrc && \
+    echo '# =========================================================' >> /etc/bash.bashrc && \
+    echo '' >> /etc/bash.bashrc && \
+    echo '# Conda`nın shell fonksiyonlarını yükle (conda activate için şart)' >> /etc/bash.bashrc && \
+    echo 'if [ -f /opt/conda/etc/profile.d/conda.sh ]; then' >> /etc/bash.bashrc && \
+    echo '    source /opt/conda/etc/profile.d/conda.sh' >> /etc/bash.bashrc && \
+    echo 'fi' >> /etc/bash.bashrc && \
+    echo '' >> /etc/bash.bashrc && \
+    echo '# ROS 2 Humble ortamını yükle' >> /etc/bash.bashrc && \
+    echo 'source /opt/ros/humble/setup.bash' >> /etc/bash.bashrc && \
+    echo '' >> /etc/bash.bashrc && \
+    echo '# Isaac ROS workspace`ini yükle (eğer varsa)' >> /etc/bash.bashrc && \
+    echo 'if [ -f /workspaces/isaac_ros-dev/install/setup.bash ]; then' >> /etc/bash.bashrc && \
+    echo '    source /workspaces/isaac_ros-dev/install/setup.bash' >> /etc/bash.bashrc && \
+    echo 'fi' >> /etc/bash.bashrc && \
+    echo '' >> /etc/bash.bashrc && \
+    echo "# 'qt' conda ortamını otomatik olarak aktive et" >> /etc/bash.bashrc && \
+    echo 'conda activate qt' >> /etc/bash.bashrc && \
+    echo '' >> /etc/bash.bashrc && \
+    echo '# Conda Python`unun ROS kütüphanelerini görmesi için PYTHONPATH ayarı' >> /etc/bash.bashrc && \
+    echo 'export PYTHONPATH=$PYTHONPATH:/opt/ros/humble/lib/python3.10/site-packages:/workspaces/isaac_ros-dev/install/sadek_interfaces/local/lib/python3.10/dist-packages' >> /etc/bash.bashrc
