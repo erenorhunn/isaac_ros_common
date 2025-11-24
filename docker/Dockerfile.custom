@@ -1,0 +1,85 @@
+# ==============================================================================
+# Base Image (run_dev.sh tarafından sağlanır, genelde isaac_ros_dev-x86_64 veya aarch64)
+# ==============================================================================
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+# ==============================================================================
+# 1. Temel Sistem Araçları ve GUI Bağımlılıkları
+# ==============================================================================
+# PySide6 ve OpenCV-Python'un çalışması için gerekli grafik kütüphaneleri
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    curl \
+    git \
+    nano \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libxkbcommon-x11-0 \
+    libegl1-mesa \
+    libdbus-1-3 \
+    libxcb-icccm4 \
+    libxcb-image0 \
+    libxcb-keysyms1 \
+    libxcb-randr0 \
+    libxcb-render-util0 \
+    libxcb-xinerama0 \
+    libxcb-xinput0 \
+    libxcb-xfixes0 \
+    libxcb-cursor0 \
+    python3-posix-ipc \
+    python3-numpy \
+    && rm -rf /var/lib/apt/lists/*
+
+# ==============================================================================
+# 2. Miniforge (Conda) Kurulumu
+# ==============================================================================
+# Mimariyi (x86_64 veya aarch64/Jetson) otomatik algılar
+ENV CONDA_DIR=/opt/conda
+ENV PATH=$CONDA_DIR/bin:$PATH
+
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        INSTALLER_URL="https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        INSTALLER_URL="https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh"; \
+    else \
+        echo "Unsupported architecture: $ARCH"; exit 1; \
+    fi && \
+    wget -q $INSTALLER_URL -O /tmp/miniforge.sh && \
+    /bin/bash /tmp/miniforge.sh -b -p $CONDA_DIR && \
+    rm /tmp/miniforge.sh && \
+    conda clean --all -y
+
+# ==============================================================================
+# 3. 'qt' Ortamının Hazırlanması
+# ==============================================================================
+# Python 3.10 ile ortamı kur ve gerekli paketleri yükle
+# Not: rclpy'ı pip ile kurmuyoruz, sistemden (ROS) çekeceğiz.
+RUN conda create -n qt python=3.10 -y && \
+    /opt/conda/envs/qt/bin/pip install \
+        PySide6 \
+        opencv-python \
+        numpy \
+        pyyaml \
+    && conda clean --all -y
+
+# ==============================================================================
+# 4. Ortam Ayarları (.bashrc)
+# ==============================================================================
+# Container açıldığında sırasıyla:
+# 1. ROS 2 Humble ortamını yükle (Sistem kütüphaneleri için)
+# 2. Isaac ROS workspace'ini yükle (Bizim mesajlarımız için)
+# 3. Conda 'qt' ortamını aktif et
+# 4. PYTHONPATH'i güncelle (Conda python'unun ROS kütüphanelerini görmesi için)
+
+RUN pip install catkin_pkg empy==3.3.4 lark numpy
+
+RUN echo 'source /opt/ros/humble/setup.bash' >> /root/.bashrc && \
+    echo 'source /workspaces/isaac_ros-dev/install/setup.bash' >> /root/.bashrc && \
+    echo 'conda activate qt' >> /root/.bashrc && \
+    # Kritik: Conda Python'unun ROS 2 paketlerini görmesini sağlayan ayar
+    echo 'export PYTHONPATH=$PYTHONPATH:/opt/ros/humble/lib/python3.10/site-packages:/workspaces/isaac_ros-dev/install/sadek_interfaces/local/lib/python3.10/dist-packages' >> /root/.bashrc
+
+# Shell başlangıcında conda'yı initialize et
+RUN conda init bash
