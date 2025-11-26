@@ -290,6 +290,9 @@ docker run -it --rm \
     --gpus all \
     -e DISPLAY=$DISPLAY \
     --device=/dev/video0 \
+    --device=/dev/video1 \
+    --device=/dev/video2 \
+    --device=/dev/video3 \
     --group-add video \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -v /dev/*:/dev/* \
