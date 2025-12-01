@@ -45,7 +45,25 @@ RUN /opt/conda/bin/conda create -n qt python=3.10 -y && \
 # ==============================================================================
 RUN pip install catkin_pkg empy==3.3.4 lark numpy
 
-# --- NİHAİ ÇÖZÜM BURADA ---
+
+# ==============================================================================
+# 5. Özel Isaac ROS ve Robot Bağımlılıkları (Rosdep kaynaklı)
+# ==============================================================================
+# Not: 'ros-humble-nova-carter-bringup' paketi nvblox, nav2, perceptor ve 
+# birçok Isaac ROS bağımlılığını (nvidia-compute-560 vb.) otomatik olarak çeker.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-humble-foxglove-msgs \
+    ros-humble-isaac-ros-h264-decoder \
+    ros-humble-isaac-ros-visual-slam \
+    ros-humble-nova-carter-bringup \
+    ros-humble-usb-cam \
+    ffmpeg \
+    v4l-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# ==============================================================================
+# 6. Bashrc Yapılandırması (En Sonda)
+# ==============================================================================
 # Ayarları, interaktif bir shell başlatan HER KULLANICI için geçerli olacak
 # /etc/bash.bashrc dosyasına ekliyoruz.
 RUN echo '' >> /etc/bash.bashrc && \
@@ -65,9 +83,9 @@ RUN echo '' >> /etc/bash.bashrc && \
     echo 'if [ -f /workspaces/isaac_ros-dev/install/setup.bash ]; then' >> /etc/bash.bashrc && \
     echo '    source /workspaces/isaac_ros-dev/install/setup.bash' >> /etc/bash.bashrc && \
     echo 'fi' >> /etc/bash.bashrc && \
-    echo '' >> /etc/bash.bashrc && \
-    echo "# 'qt' conda ortamını otomatik olarak aktive et" >> /etc/bash.bashrc && \
-    echo 'conda activate qt' >> /etc/bash.bashrc && \
+    # echo '' >> /etc/bash.bashrc && \
+    # echo "# 'qt' conda ortamını otomatik olarak aktive et" >> /etc/bash.bashrc && \
+    # echo 'conda activate qt' >> /etc/bash.bashrc && \
     echo '' >> /etc/bash.bashrc && \
     echo '# Conda Python`unun ROS kütüphanelerini görmesi için PYTHONPATH ayarı' >> /etc/bash.bashrc && \
     echo 'export PYTHONPATH=$PYTHONPATH:/opt/ros/humble/lib/python3.10/site-packages:/workspaces/isaac_ros-dev/install/sadek_interfaces/local/lib/python3.10/dist-packages' >> /etc/bash.bashrc
