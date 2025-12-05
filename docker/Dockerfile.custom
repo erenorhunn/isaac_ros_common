@@ -43,7 +43,7 @@ RUN /opt/conda/bin/conda create -n qt python=3.10 -y && \
 # ==============================================================================
 # 4. Ortam Ayarları (Sistem Geneli)
 # ==============================================================================
-RUN pip install catkin_pkg empy==3.3.4 lark numpy
+RUN pip install catkin_pkg empy==3.3.4 lark numpy psutil ultralytics pyyaml
 
 
 # ==============================================================================
